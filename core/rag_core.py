@@ -1,0 +1,115 @@
+import os
+import warnings
+from typing import List, Tuple
+
+# LangChain imports for conversational RAG
+from langchain_classic.chains import create_history_aware_retriever
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate
+
+# Core LangChain and community imports
+from langchain_core.documents import Document
+from langchain_community.document_loaders import PyPDFLoader, TextLoader, Docx2txtLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_classic.chains import create_retrieval_chain
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+
+warnings.filterwarnings("ignore")
+
+
+def load_document(file_path: str) -> List[Document]:
+    """Loads a document from a file path."""
+    file_extension = os.path.splitext(file_path)[1].lower()
+    if file_extension == ".pdf":
+        loader = PyPDFLoader(file_path)
+    elif file_extension == ".txt":
+        loader = TextLoader(file_path, encoding="utf-8")
+    elif file_extension == ".docx":
+        loader = Docx2txtLoader(file_path)
+    else:
+        raise ValueError(f"Unsupported file format: {file_extension}")
+    return loader.load()
+
+
+def auto_select_chunk_size(documents: List[Document]) -> Tuple[int, int]:
+    """Automatically chooses optimal chunk size and overlap based on document length."""
+    full_text = "".join([doc.page_content for doc in documents])
+    total_length = len(full_text)
+    if total_length < 5000:
+        return 500, 100
+    elif total_length < 50000:
+        return 1000, 200
+    else:
+        return 1500, 300
+
+
+def split_documents(
+    documents: List[Document], chunk_size: int, chunk_overlap: int
+) -> List[Document]:
+    """Splits documents into smaller chunks."""
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=len,
+        separators=["\n\n", "\n", ". ", " ", ""],
+    )
+    return text_splitter.split_documents(documents)
+
+
+def create_conversational_rag_chain(
+    documents: List[Document], api_key: str, chunk_size: int, chunk_overlap: int
+):
+    """Creates a conversational RAG chain that is aware of chat history."""
+    os.environ["GOOGLE_API_KEY"] = api_key
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+
+    chunks = split_documents(documents, chunk_size, chunk_overlap)
+    if not chunks:
+        raise ValueError("Document splitting resulted in no chunks.")
+
+    vectorstore = FAISS.from_documents(documents=chunks, embedding=embeddings)
+    retriever = vectorstore.as_retriever(
+        search_type="similarity", search_kwargs={"k": 4}
+    )
+
+    # 1. Contextualize question prompt
+    contextualize_q_system_prompt = (
+        "Given a chat history and the latest user question "
+        "which might reference context in the chat history, "
+        "formulate a standalone question which can be understood "
+        "without the chat history. Do NOT answer the question, "
+        "just reformulate it if needed and otherwise return it as is."
+    )
+    contextualize_q_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", contextualize_q_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+    history_aware_retriever = create_history_aware_retriever(
+        llm, retriever, contextualize_q_prompt
+    )
+
+    # 2. Answering prompt
+    qa_system_prompt = (
+        "You are an expert assistant for question-answering tasks. "
+        "Use the provided context to answer the question. "
+        "If you don't know the answer, just say that you don't know. "
+        "Keep the answer concise and use a maximum of three sentences.\n\n"
+        "Context: {context}"
+    )
+    qa_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", qa_system_prompt),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+        ]
+    )
+
+    question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
+    rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
+    return rag_chain

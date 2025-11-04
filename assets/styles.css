@@ -1,0 +1,89 @@
+/* General Styling */
+body {
+    font-family: 'Inter', 'Noto Sans', sans-serif;
+}
+
+/* Hide Streamlit Header and Footer */
+.st-emotion-cache-16txtl3 {
+    padding-top: 2rem;
+}
+
+/* Main content area */
+.main .block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Sidebar Styling */
+[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    border-right: 1px solid #e7edf3;
+}
+
+[data-testid="stSidebar"] h2 {
+    font-size: 22px !important;
+    font-weight: bold;
+    tracking-letter: -0.015em;
+}
+
+/* Buttons Styling */
+.stButton>button {
+    border-radius: 0.5rem;
+    font-weight: bold;
+    color: #0d141b;
+    background-color: #e7edf3;
+    border: none;
+    transition: background-color 0.2s ease;
+}
+
+.stButton>button:hover {
+    background-color: #cfdbe7;
+    color: #0d141b;
+}
+
+.stButton>button:focus {
+    background-color: #e7edf3 !important;
+    color: #0d141b !important;
+    box-shadow: none !important;
+}
+
+/* Primary Button */
+.stButton>button.st-emotion-cache-19n6bn1 {
+    background-color: #1380ec;
+    color: #ffffff;
+}
+
+.stButton>button.st-emotion-cache-19n6bn1:hover {
+    background-color: #0b69c4;
+    color: #ffffff;
+}
+
+.stButton>button.st-emotion-cache-19n6bn1:focus {
+    background-color: #1380ec !important;
+    color: #ffffff !important;
+}
+
+
+/* Chat message styling */
+[data-testid="stChatMessage"] {
+    border-radius: 0.5rem;
+    padding: 1rem;
+    background-color: #e7edf3;
+}
+
+/* File Uploader Styling */
+[data-testid="stFileUploader"] {
+    border: 2px dashed #cfdbe7;
+    border-radius: 0.5rem;
+    padding: 2rem;
+}
+
+[data-testid="stFileUploader"] label {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+[data-testid="stFileUploader"] span {
+    font-size: 1rem;
+    font-weight: normal;
+}
