@@ -24,6 +24,7 @@ load_css("assets/styles.css")
 
 # --- SESSION STATE INITIALIZATION ---
 def initialize_session_state():
+    """Initializes session state variables if they don't exist."""
     defaults = {
         "messages": [
             {
@@ -36,6 +37,8 @@ def initialize_session_state():
         "chunk_size": 1000,
         "chunk_overlap": 200,
         "uploaded_file_name": None,
+        "manual_mode": False,
+        "uploaded_file_obj": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -44,9 +47,9 @@ def initialize_session_state():
 
 # --- HELPER FUNCTIONS ---
 def format_chat_history(messages):
-    """Formats chat history for LangChain."""
+    """Formats chat history for LangChain by converting dicts to message objects."""
     history = []
-    for msg in messages[1:]:  # Skip initial assistant message
+    for msg in messages[1:]:  # Skip the initial assistant greeting
         if msg["role"] == "user":
             history.append(HumanMessage(content=msg["content"]))
         elif msg["role"] == "assistant":
@@ -56,11 +59,13 @@ def format_chat_history(messages):
 
 # --- UI COMPONENTS & LOGIC ---
 def display_header():
+    """Displays the main header and subheader."""
     st.title("📄 DocuQuery")
     st.markdown("Upload a document to start a conversation. Supports PDF, Word, TXT.")
 
 
 def display_chat_history():
+    """Displays the chat messages and sources from session state."""
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
@@ -75,6 +80,7 @@ def display_chat_history():
 def handle_document_processing(
     uploaded_file, api_key, mode, manual_chunk_size, manual_chunk_overlap
 ):
+    """Handles the entire Stage 1 processing pipeline for a document."""
     with st.spinner("Processing document... This may take a moment."):
         try:
             with tempfile.NamedTemporaryFile(
@@ -120,6 +126,7 @@ def handle_document_processing(
 
 # --- MAIN APPLICATION ---
 def main():
+    """The main function that orchestrates the entire application."""
     initialize_session_state()
     api_key, mode, manual_chunk_size, manual_chunk_overlap = show_sidebar()
     display_header()
@@ -130,14 +137,31 @@ def main():
         label_visibility="collapsed",
     )
 
-    if uploaded_file and (uploaded_file.name != st.session_state.uploaded_file_name):
+    # Persist the uploaded file object in session state for reprocessing
+    if uploaded_file:
+        st.session_state.uploaded_file_obj = uploaded_file
+
+    # Safely get and remove the reprocess trigger flag so it only runs once
+    should_reprocess = st.session_state.pop("trigger_reprocess", False)
+
+    # Define the conditions under which the document processing should run
+    is_new_file_uploaded = uploaded_file and (
+        uploaded_file.name != st.session_state.get("uploaded_file_name")
+    )
+    is_reprocess_triggered = (
+        should_reprocess and st.session_state.get("uploaded_file_obj") is not None
+    )
+
+    if is_new_file_uploaded or is_reprocess_triggered:
         if not api_key:
             st.warning(
-                "Please enter your Google Gemini API key in the sidebar to begin."
+                "Please enter your Google Gemini API key to process the document."
             )
         else:
+            # Determine which file to process: the new one or the existing one for reprocessing
+            file_to_process = uploaded_file or st.session_state.get("uploaded_file_obj")
             handle_document_processing(
-                uploaded_file, api_key, mode, manual_chunk_size, manual_chunk_overlap
+                file_to_process, api_key, mode, manual_chunk_size, manual_chunk_overlap
             )
 
     st.divider()
@@ -145,7 +169,7 @@ def main():
 
     if prompt := st.chat_input("Ask a question..."):
         if st.session_state.rag_chain is None:
-            st.warning("Please upload a document first.")
+            st.warning("Please upload and process a document first.")
             return
 
         st.session_state.messages.append({"role": "user", "content": prompt})

@@ -2,6 +2,7 @@
 
 An advanced, conversational AI assistant designed to let you chat with your documents. `DocuQuery` goes beyond simple Q&A by leveraging a history-aware RAG pipeline, enabling natural, multi-turn conversations about the contents of PDF, Word, and text files.
 
+
 ---
 
 ### 📋 Table of Contents
@@ -76,15 +77,18 @@ When a document is first uploaded, it undergoes a comprehensive indexing pipelin
     4.  All vectors are stored and indexed in a highly efficient, in-memory **FAISS vector store**.
 *   **Benefit**: This upfront investment creates a searchable knowledge base that enables millisecond-fast document retrieval during the conversation.
 
-### **Stage 2: The Conversational Agent (RAG Loop)**
+#### **Stage 2: The Conversational Agent (RAG Loop)**
 
 This is where the magic happens. Instead of a simple query, the system engages in a multi-step reasoning process for every question.
 
 *   **Process**:
-    1.  **Contextualize**: The user's latest question (e.g., "what about that one?") is combined with the history of the conversation.
-    2.  **Rewrite for Retrieval**: This is the key step. The combined context is sent to a Gemini LLM with a single, crucial instruction: "Rewrite this into a standalone question." For example, the input becomes a query like: `"How does Retrieval-Augmented Generation work with LangChain?"`. This step is a deliberate engineering trade-off that prioritizes **retrieval accuracy** over minimal latency.
+    1.  **Contextualize**: The user's latest question (e.g., "How does that work with LangChain?") is combined with the history of the conversation.
+    2.  **Rewrite for Retrieval**: This is the key step. The combined context is sent to a Gemini LLM with a single, crucial instruction: "Rewrite this into a standalone question." For example, the input becomes a query like: `"How does Retrieval-Augmented Generation work with LangChain?"`. This step is a deliberate engineering trade-off that prioritizes **retrieval accuracy** above all else.
     3.  **Retrieve**: The newly formulated, self-contained question is used to perform a similarity search against the FAISS vector store, retrieving the most relevant document chunks.
-    4.  **Synthesize**: A final LLM call is made. It receives the original user question, the full chat history (for conversational context), and the retrieved document chunks (for factual grounding) to generate a helpful, accurate, and natural-sounding response.
+    4.  **Synthesize**: A final LLM call is made. It receives two distinct sets of information:
+        *   **Factual Grounding**: The retrieved document chunks from the step above.
+        *   **Conversational Context**: The original user question and the full chat history.
+        *   **This separation is critical**: The retriever gets a clean, rewritten query to find the best facts, while the final LLM gets the full history to formulate an answer that is not only factually correct but also natural and contextually appropriate.
 
 ---
 
@@ -114,7 +118,7 @@ Let's trace a multi-turn conversation to see the architecture in action.
 | ------------------------ | -------------------------------------------------- | ------------------------------------------------------------ |
 | **Framework**            | Streamlit                                          | Building the interactive web application interface.          |
 | **LLM Orchestration**    | LangChain                                          | Managing the complex agentic workflows and prompt chains.    |
-| **LLM & Embeddings**     | Google Gemini API (`gemini-1.5-flash-latest`)      | Powering question rewriting, answer synthesis, and text embeddings. |
+| **LLM & Embeddings**     | Google Gemini API (`gemini-2.5-flash`)      | Powering question rewriting, answer synthesis, and text embeddings. |
 | **Vector Store**         | FAISS (In-Memory)                                  | High-speed similarity search for document retrieval.         |
 | **Interface**            | Streamlit Chat                                     | Creating the conversational chat UI.                         |
 | **State Management**     | `st.session_state`                                 | Persisting the RAG chain and chat history between interactions. |
