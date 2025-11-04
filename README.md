@@ -2,6 +2,7 @@
 
 An advanced, conversational AI assistant designed to let you chat with your documents. `DocuQuery` goes beyond simple Q&A by leveraging a history-aware RAG pipeline, enabling natural, multi-turn conversations about the contents of PDF, Word, and text files.
 
+<img width="2560" height="1327" alt="image" src="https://github.com/user-attachments/assets/3165e58a-d183-4873-94b7-ce55e75c3758" />
 
 ---
 
