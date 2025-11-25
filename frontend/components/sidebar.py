@@ -24,12 +24,6 @@ def show_sidebar():
     """Displays the sidebar, handles settings, and returns the configuration."""
     with st.sidebar:
         st.header("⚙️ Settings")
-        api_key = st.text_input(
-            "Google Gemini API Key",
-            type="password",
-            help="Get your free API key from [Google AI Studio](https://a.istudio.google.com/app/apikey).",
-            value=st.session_state.get("api_key", ""),
-        )
 
         st.subheader("Processing Options")
 
@@ -53,7 +47,7 @@ def show_sidebar():
 
             st.markdown("---")
 
-            is_doc_processed = st.session_state.get("rag_chain") is not None
+            is_doc_processed = st.session_state.get("document_processed")
             if st.button(
                 "Apply & Reprocess Document",
                 use_container_width=True,
@@ -61,7 +55,6 @@ def show_sidebar():
                 type="primary",
                 help="Apply the manual chunking settings to the loaded document.",
             ):
-                st.session_state.api_key = api_key
                 st.session_state.chunk_size = chunk_size
                 st.session_state.chunk_overlap = chunk_overlap
                 st.session_state.trigger_reprocess = True
@@ -69,7 +62,6 @@ def show_sidebar():
                 st.rerun()
 
         if st.button("Save Settings", use_container_width=True):
-            st.session_state.api_key = api_key
             st.session_state.chunk_size = chunk_size
             st.session_state.chunk_overlap = chunk_overlap
             st.toast("Settings saved!", icon="✅")
@@ -105,4 +97,4 @@ def show_sidebar():
             disabled=not is_chat_started,
         )
 
-    return api_key, processing_mode, chunk_size, chunk_overlap
+    return processing_mode, chunk_size, chunk_overlap

@@ -1,4 +1,6 @@
-streamlit
+fastapi
+uvicorn
+pydantic
 langchain
 langchain-classic
 langchain-google-genai
@@ -8,3 +10,8 @@ faiss-cpu
 pypdf
 python-docx
 python-dotenv
+rank_bm25
+presidio_analyzer
+presidio_anonymizer
+ragas
+datasets
