@@ -16,6 +16,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmb
 from langchain_classic.chains import create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 
+# For Hybrid Search
+from langchain_community.retrievers.ensemble import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
+
+
 warnings.filterwarnings("ignore")
 
 
@@ -63,17 +68,28 @@ def create_conversational_rag_chain(
 ):
     """Creates a conversational RAG chain that is aware of chat history."""
     os.environ["GOOGLE_API_KEY"] = api_key
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
-    embeddings = GoogleGenerativeAIEmbeddings(model="gemini-embedding-001")
+    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
     chunks = split_documents(documents, chunk_size, chunk_overlap)
     if not chunks:
         raise ValueError("Document splitting resulted in no chunks.")
 
-    vectorstore = FAISS.from_documents(documents=chunks, embedding=embeddings)
-    retriever = vectorstore.as_retriever(
+    # FAISS vector store for semantic search
+    faiss_vectorstore = FAISS.from_documents(documents=chunks, embedding=embeddings)
+    faiss_retriever = faiss_vectorstore.as_retriever(
         search_type="similarity", search_kwargs={"k": 4}
     )
+
+    # BM25 retriever for keyword search
+    bm25_retriever = BM25Retriever.from_documents(chunks)
+    bm25_retriever.k = 4
+
+    # Ensemble retriever to combine both methods
+    ensemble_retriever = EnsembleRetriever(
+        retrievers=[bm25_retriever, faiss_retriever], weights=[0.5, 0.5]
+    )
+
 
     # 1. Contextualize question prompt
     contextualize_q_system_prompt = (
@@ -91,7 +107,7 @@ def create_conversational_rag_chain(
         ]
     )
     history_aware_retriever = create_history_aware_retriever(
-        llm, retriever, contextualize_q_prompt
+        llm, ensemble_retriever, contextualize_q_prompt
     )
 
     # 2. Answering prompt
