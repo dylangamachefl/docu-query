@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import os
 from components.sidebar import show_sidebar
+from components.data_extraction import show_extraction_ui
 
 # --- CONFIGURATION ---
 BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8000")
@@ -117,45 +118,62 @@ def main():
         handle_document_upload(file_to_process, mode, manual_chunk_size, manual_chunk_overlap)
 
     st.divider()
-    display_chat_history()
 
-    if prompt := st.chat_input("Ask a question..."):
-        if not st.session_state.document_processed:
-            st.warning("Please upload and process a document first.")
-            return
+    # --- TABS FOR CHAT AND DATA EXTRACTION ---
+    tab1, tab2 = st.tabs(["💬 Chat", "📊 Data Extraction"])
 
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
+    with tab1:
+        display_chat_history()
+        if prompt := st.chat_input("Ask a question..."):
+            if not st.session_state.document_processed:
+                st.warning("Please upload and process a document first.")
+                return
 
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            st.chat_message("user").write(prompt)
+
+            with st.chat_message("assistant"):
                 try:
                     payload = {
                         "input_text": prompt,
-                        "chat_history": st.session_state.messages[:-1], # Exclude the current prompt
+                        "chat_history": [
+                            msg for msg in st.session_state.messages if msg["role"] != "sources"
+                        ],
                         "uploaded_file_name": st.session_state.uploaded_file_name,
-                        "mode": mode,
-                        "manual_chunk_size": manual_chunk_size,
-                        "manual_chunk_overlap": manual_chunk_overlap,
                     }
-                    response = requests.post(f"{BACKEND_URL}/query", json=payload)
-                    response.raise_for_status()
 
-                    bot_response = response.json()
+                    def stream_generator():
+                        """Generator to stream response from the backend."""
+                        with requests.post(
+                            f"{BACKEND_URL}/stream_chat", json=payload, stream=True
+                        ) as response:
+                            response.raise_for_status()
+                            for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+                                yield chunk
+
+                    full_response = st.write_stream(stream_generator)
+
+                    # Fetch sources after the stream is complete
+                    sources_response = requests.get(
+                        f"{BACKEND_URL}/get_sources/{st.session_state.uploaded_file_name}"
+                    )
+                    sources = sources_response.json() if sources_response.status_code == 200 else []
+
                     bot_message = {
                         "role": "assistant",
-                        "content": bot_response.get("answer"),
-                        "sources": bot_response.get("sources", []),
+                        "content": full_response,
+                        "sources": sources,
                     }
                     st.session_state.messages.append(bot_message)
                     st.rerun()
 
                 except requests.exceptions.RequestException as e:
-                    error_msg = f"Error communicating with backend: {e}"
-                    st.error(error_msg)
+                    st.error(f"Error communicating with backend: {e}")
                 except Exception as e:
-                    error_msg = f"An unexpected error occurred: {str(e)}"
-                    st.error(error_msg)
+                    st.error(f"An unexpected error occurred: {str(e)}")
+
+    with tab2:
+        show_extraction_ui(BACKEND_URL)
 
 
 if __name__ == "__main__":

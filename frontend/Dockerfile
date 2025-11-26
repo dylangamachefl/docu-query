@@ -17,4 +17,4 @@ COPY --from=builder /app /app
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "app.py"]
+CMD ["python", "-m", "streamlit", "run", "app.py"]
