@@ -7,7 +7,7 @@ langchain-google-genai
 langchain-community
 langchain-text-splitters
 faiss-cpu
-pypdf
+pymupdf
 python-docx
 python-dotenv
 rank_bm25
